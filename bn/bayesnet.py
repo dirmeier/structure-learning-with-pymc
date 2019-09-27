@@ -2,19 +2,26 @@ import networkx
 import numpy
 import scipy
 import scipy.stats
-from random import shuffle
+
 
 class BayesianNetwork:
     NAME = "BayesianNetwork"
 
     def __init__(self, variables, *args, **kwargs):
-        self.__variables = variables
+        self.__variables = numpy.array(variables)
+        self.__varidx_map = {e: i for i, e in enumerate(self.vars)}
         self.__p = len(variables)
-        self.__prob = 0.5
+        self.__prob = .5
+        self.__acceptance_rate = .5
         if "prob" in kwargs:
             self.__prob = kwargs["prob"]
-        print(self.__prob)
+        if "acceptance_rate" in kwargs:
+            self.__acceptance_rate = kwargs["acceptance_rate"]
         self.__runif = scipy.stats.uniform.rvs
+
+    @property
+    def vars(self):
+        return self.__variables
 
     @property
     def p(self):
@@ -31,37 +38,65 @@ class BayesianNetwork:
         name = r'\text{%s}' % name
         return r'${} \sim \text{{BayesianNetwork}}(\dots)$'.format(name)
 
-    def random(self, point=None):
-        next_point = numpy.zeros(shape=(self.__p, self.__p), dtype=numpy.int8)
-        if point is None:
-            return self._random(next_point)
-        else:
-            return self._mc_random(point.copy())
+    def as_graph(self, adj):
+        graph = networkx.from_numpy_array(
+          adj, create_using=networkx.DiGraph)
+        graph = networkx.relabel_nodes(
+          graph, {i: e for i, e in enumerate(self.vars)})
+        return graph
 
-    def _random(self, next_point):
+    def posterior_sample(self, adj):
+        new_adj = self._random(adj)
+        
+
+    def random(self, point=None):
+        if point is not None:
+            return self._mc_random(point.copy())
+        return self._random()
+
+    def _random(self):
+        adj = numpy.zeros(shape=(self.__p, self.__p), dtype=numpy.int8)
         for i in range(0, self.p - 1):
             for j in range(i + 1, self.p):
                 if self.__runif() <= self.__prob:
-                    next_point[i, j] = 1
-        shuffle(self.__variables)
-        graph = networkx.from_numpy_array(next_point, create_using=networkx.DiGraph)
-        graph = networkx.relabel_nodes(
-          graph,
-          {i: e for i, e in enumerate(self.__variables)})
-        return graph
+                    adj[i, j] = 1
+        gm = numpy.random.permutation(self.vars)
+        idxs = numpy.array([self.__varidx_map[g] for g in gm])
+        adj = adj[idxs, :]
+        adj = adj[:, idxs]
+        return adj
 
-    def _mc_random(self, next_point):
+    def _mc_random(self, adj):
+        ch = numpy.random.choice(["reverse"])
+        if ch == "remove":
+            return self._remove_edge(adj)
+        if ch == "add":
+            return self._add_edge(adj)
+        if ch == "reverse":
+            return self._reverse_edge(adj)
+        return adj
 
-        ch = numpy.random.choice(["remove", "add", "reverse"])
-        #if ch == "remove":
-        args = numpy.argwhere(next_point == 1)
+    def _remove_edge(self, adj):
+        args = numpy.argwhere(adj == 1)
         idx = numpy.random.choice(range(args.shape[0]))
-        next_point[ args[idx][0], args[idx][1] ] = 0
+        adj[args[idx][0], args[idx][1]] = 0
+        return adj
 
-        graph = networkx.from_numpy_array(next_point,
-                                          create_using=networkx.DiGraph)
-        graph = networkx.relabel_nodes(
-          graph,
-          {i: e for i, e in enumerate(self.__variables)})
+    def _add_edge(self, adj):
+        args = numpy.argwhere(adj == 0)
+        for i, j in args:
+            adj[i, j] = 1
+            if networkx.is_directed_acyclic_graph(self.as_graph(adj)):
+                return adj
+            adj[i, j] = 0
+        return adj
 
-        return graph
+    def _reverse_edge(self, adj):
+        args = numpy.argwhere(adj == 1)
+        for i, j in args:
+            if adj[i, j] == 1 and adj[j, i] == 0:
+                adj[i, j], adj[j, i] = 0, 1
+            if networkx.is_directed_acyclic_graph(self.as_graph(adj)):
+                return adj
+            adj[i, j], adj[j, i] = 1, 0
+        return adj
