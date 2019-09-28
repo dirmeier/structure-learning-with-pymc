@@ -5,11 +5,11 @@ import scipy.stats
 from bn.variable import Variable
 
 
-class BayesianNetwork:
-    NAME = "BayesianNetwork"
+class Structure:
+    NAME = "Structure"
     runif = scipy.stats.uniform.rvs
 
-    def __init__(self, variables, adj=None, **kwargs):
+    def __init__(self, variables, **kwargs):
         if not isinstance(variables, list):
             raise TypeError()
         if any(not isinstance(x, Variable) for x in variables):
@@ -18,7 +18,6 @@ class BayesianNetwork:
         self.__vars = numpy.array(variables)
         self.__n_var = len(variables)
         self.__varidx_map = {e.name: i for i, e in enumerate(self.vars)}
-        self.__adj = adj
 
         self.__prob = kwargs.get("prob", .5)
         self.__c = kwargs.get("c", .9)
@@ -34,7 +33,7 @@ class BayesianNetwork:
 
     @property
     def name(self):
-        return BayesianNetwork.NAME
+        return Structure.NAME
 
     def logp(self, value):
         return 0
@@ -42,18 +41,6 @@ class BayesianNetwork:
     def _repr_latex_(self, name=None, dist=None):
         name = r'\text{%s}' % name
         return r'${} \sim \text{{BayesianNetwork}}(\dots)$'.format(name)
-
-    def sample_data(self, n=1):
-        topo = [x for x in networkx.topological_sort(self.as_graph(self.__adj))]
-        print(topo)
-
-
-    def as_graph(self, adj):
-        graph = networkx.from_numpy_array(
-          adj, create_using=networkx.DiGraph)
-        graph = networkx.relabel_nodes(
-          graph, {i: e for i, e in enumerate(self.vars)})
-        return graph
 
     def posterior_sample(self, adj):
         new_adj = self.random(adj)
