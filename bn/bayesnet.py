@@ -1,31 +1,37 @@
 import networkx
 import numpy
-import scipy
 import scipy.stats
+
+from bn import Variable
 
 
 class BayesianNetwork:
     NAME = "BayesianNetwork"
+    runif = scipy.stats.uniform.rvs
 
-    def __init__(self, variables, *args, **kwargs):
-        self.__variables = numpy.array(variables)
-        self.__varidx_map = {e: i for i, e in enumerate(self.vars)}
-        self.__p = len(variables)
-        self.__prob = .5
-        self.__acceptance_rate = .5
-        if "prob" in kwargs:
-            self.__prob = kwargs["prob"]
-        if "acceptance_rate" in kwargs:
-            self.__acceptance_rate = kwargs["acceptance_rate"]
-        self.__runif = scipy.stats.uniform.rvs
+    def __init__(self, variables=None, **kwargs):
+        if not isinstance(variables, list):
+            raise TypeError()
+        if all(isinstance(x, Variable) for x in variables):
+            raise TypeError()
+
+        self.__vars = numpy.array(variables)
+        self.__n_var = len(variables)
+        self.__varidx_map = {e.name: i for i, e in enumerate(self.vars)}
+        self.__adj = kwargs.get("adj", None)
+        self.__lpd = kwargs.get("lpd", None)
+
+        self.__prob = kwargs.get("prob", .5)
+        self.__c = kwargs.get("c", .9)
+        self.__acceptance_rate = kwargs.get("acceptance_rate", .5)
 
     @property
     def vars(self):
-        return self.__variables
+        return self.__vars
 
     @property
-    def p(self):
-        return self.__p
+    def n_var(self):
+        return self.__n_var
 
     @property
     def name(self):
@@ -46,8 +52,19 @@ class BayesianNetwork:
         return graph
 
     def posterior_sample(self, adj):
-        new_adj = self._random(adj)
-        
+        new_adj = self.random(adj)
+        p_new_adj = self.log_prior_probabilty(new_adj)
+        lik = self.logevidence(adj)
+
+    def log_prior_probabilty(self, adj):
+        return self.__c * len(numpy.argwhere(adj == 1))
+
+    def logevidence(self, adj):
+        evidence = 0
+        for i, e in enumerate(self.vars):
+            parents = numpy.argwhere(adj[:, i] == 1)[0]
+            s = 2
+        k = 2
 
     def random(self, point=None):
         if point is not None:
@@ -55,9 +72,9 @@ class BayesianNetwork:
         return self._random()
 
     def _random(self):
-        adj = numpy.zeros(shape=(self.__p, self.__p), dtype=numpy.int8)
-        for i in range(0, self.p - 1):
-            for j in range(i + 1, self.p):
+        adj = numpy.zeros(shape=(self.n_var, self.n_var), dtype=numpy.int8)
+        for i in range(0, self.n_var - 1):
+            for j in range(i + 1, self.n_var):
                 if self.__runif() <= self.__prob:
                     adj[i, j] = 1
         gm = numpy.random.permutation(self.vars)
