@@ -2,24 +2,23 @@ import networkx
 import numpy
 import scipy.stats
 
-from bn import Variable
+from bn.variable import Variable
 
 
 class BayesianNetwork:
     NAME = "BayesianNetwork"
     runif = scipy.stats.uniform.rvs
 
-    def __init__(self, variables=None, **kwargs):
+    def __init__(self, variables, adj=None, **kwargs):
         if not isinstance(variables, list):
             raise TypeError()
-        if all(isinstance(x, Variable) for x in variables):
+        if any(not isinstance(x, Variable) for x in variables):
             raise TypeError()
 
         self.__vars = numpy.array(variables)
         self.__n_var = len(variables)
         self.__varidx_map = {e.name: i for i, e in enumerate(self.vars)}
-        self.__adj = kwargs.get("adj", None)
-        self.__lpd = kwargs.get("lpd", None)
+        self.__adj = adj
 
         self.__prob = kwargs.get("prob", .5)
         self.__c = kwargs.get("c", .9)
@@ -43,6 +42,11 @@ class BayesianNetwork:
     def _repr_latex_(self, name=None, dist=None):
         name = r'\text{%s}' % name
         return r'${} \sim \text{{BayesianNetwork}}(\dots)$'.format(name)
+
+    def sample_data(self, n=1):
+        topo = [x for x in networkx.topological_sort(self.as_graph(self.__adj))]
+        print(topo)
+
 
     def as_graph(self, adj):
         graph = networkx.from_numpy_array(
