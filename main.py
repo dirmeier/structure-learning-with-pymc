@@ -4,8 +4,10 @@ import networkx
 import matplotlib.pyplot as plt
 import pandas as pd
 
+from bn.bayesian_network import BayesianNetwork
+from bn.structure_distribution import Structure
 from bn.variable import Variable
-from bn.bayesnet import BayesianNetwork
+
 
 # b = BayesianNetwork(["a", "b", "c", "d", "e"], prob=.5)
 
@@ -54,7 +56,7 @@ letter = Variable(
   pd.DataFrame(
     {"grade": ["good", "good", "ok", "ok", "bad", "bad"],
      "letter": ["weak", "strong", "weak", "strong", "weak", "strong"],
-     "probability": [0.1, 0.9, 0.4, 0.6, 0.99, 0.1]})
+     "probability": [0.1, 0.9, 0.4, 0.6, 0.99, 0.01]})
 )
 
 grade = Variable(
@@ -81,10 +83,29 @@ adj = numpy.array(
   ], dtype=numpy.int8
 )
 
-bn = BayesianNetwork([difficulty, grade, has_studied, letter, sat], adj)
-G = bn.as_graph(adj)
+#print(difficulty.lpd)
 
-print(bn.sample_data(1))
+bn = BayesianNetwork([difficulty, grade, has_studied, letter, sat], adj)
+data = bn.sample_data(100)
+
+numpy.random.seed(23)
+adj = numpy.zeros_like(adj, dtype=numpy.int8)
+distr = Structure([difficulty, grade, has_studied, letter, sat])
+best = adj
+best_score = -numpy.Inf
+for i in range(1000):
+    adj, score = distr.posterior_sample(data, adj)
+    if best_score < score:
+        best = adj
+        best_score = score
+
+G = bn.as_graph(adj)
+print(networkx.is_directed_acyclic_graph(G))
+networkx.draw(G, with_labels=True)
+plt.show()
+
+
+#print(bn.sample_data(1))
 
 #networkx.draw(G, with_labels=True)
 #plt.show()

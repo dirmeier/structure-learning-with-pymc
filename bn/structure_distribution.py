@@ -1,35 +1,23 @@
+from itertools import product
+
 import networkx
 import numpy
 import scipy.stats
+import pandas as pd
+from bn.bayesian_network import BayesianNetwork
+from bn.util import expand_grid, mv_beta
 
-from bn.variable import Variable
 
-
-class Structure:
+class Structure(BayesianNetwork):
     NAME = "Structure"
     runif = scipy.stats.uniform.rvs
 
     def __init__(self, variables, **kwargs):
-        if not isinstance(variables, list):
-            raise TypeError()
-        if any(not isinstance(x, Variable) for x in variables):
-            raise TypeError()
-
-        self.__vars = numpy.array(variables)
-        self.__n_var = len(variables)
-        self.__varidx_map = {e.name: i for i, e in enumerate(self.vars)}
-
+        super(Structure, self).__init__(variables, None)
         self.__prob = kwargs.get("prob", .5)
-        self.__c = kwargs.get("c", .9)
+        self.__alpha = kwargs.get("alpha", 1)
+        self.__log_c = numpy.log(kwargs.get("c", 1))
         self.__acceptance_rate = kwargs.get("acceptance_rate", .5)
-
-    @property
-    def vars(self):
-        return self.__vars
-
-    @property
-    def n_var(self):
-        return self.__n_var
 
     @property
     def name(self):
@@ -38,24 +26,74 @@ class Structure:
     def logp(self, value):
         return 0
 
-    def _repr_latex_(self, name=None, dist=None):
+    @staticmethod
+    def _repr_latex_(name=None, dist=None):
         name = r'\text{%s}' % name
         return r'${} \sim \text{{BayesianNetwork}}(\dots)$'.format(name)
 
-    def posterior_sample(self, adj):
+    def posterior_sample(self, data, adj):
         new_adj = self.random(adj)
-        p_new_adj = self.log_prior_probabilty(new_adj)
-        lik = self.logevidence(adj)
 
-    def log_prior_probabilty(self, adj):
-        return self.__c * len(numpy.argwhere(adj == 1))
+        p_adj = self.log_prior_prob(adj)
+        marg_lik = self.log_evidence(data, adj)
+        joint = numpy.exp(p_adj + marg_lik)
 
-    def logevidence(self, adj):
+        p_adj_prime = self.log_prior_prob(new_adj)
+        marg_lik_prime = self.log_evidence(data, new_adj)
+        joint_prime = numpy.exp(p_adj_prime + marg_lik_prime)
+
+        ac = numpy.minimum(1.0, joint_prime / joint)
+        if ac > Structure.runif(size=1):
+            return new_adj, joint_prime
+        else:
+            return adj, joint
+
+    def log_prior_prob(self, adj):
+        return self.__log_c * len(numpy.argwhere(adj == 1))
+
+    def log_evidence(self, data, adj):
         evidence = 0
-        for i, e in enumerate(self.vars):
-            parents = numpy.argwhere(adj[:, i] == 1)[0]
-            s = 2
-        k = 2
+        for i, v in enumerate(self.vars):
+            par_idx = numpy.argwhere(adj[:, i] == 1).flatten()
+            parents = None
+            if len(par_idx) != 0:
+                parents = [self.vars[p] for p in par_idx]
+            evidence += self._local_evidence(v, data, parents)
+        return evidence
+
+    def _local_evidence(self, v, data, parents):
+        ev = 0
+        if parents is None:
+            ct = pd.DataFrame({None})
+        else:
+            ct = expand_grid({p.name: p.domain for p in parents})
+        for _, c in ct.iterrows():
+            n_vc = self._counts(v, c, data, parents)
+            alpha_vc = self._pseudocounts(v, parents)
+            ev += numpy.log(mv_beta(n_vc + alpha_vc) / mv_beta(alpha_vc))
+        return ev
+
+    @staticmethod
+    def _counts(v, c, data, parents):
+        flt = ""
+        if parents is not None:
+            for p in parents:
+                flt += "{} == '{}' and ".format(p.name, c[p.name])
+        counts = [0] * len(v.domain)
+        for i, e in enumerate(v.domain):
+            e_flt = flt + "{} == '{}'".format(v.name, e)
+            d = data.query(e_flt)
+            counts[i] = d.shape[0]
+        return numpy.array(counts)
+
+    def _pseudocounts(self, v, parents):
+        if parents is None:
+            c_v = 1
+        else:
+            c_v = numpy.sum([len(p.domain) for p in parents])
+        k_v = len(v.domain)
+        alpha_vc = self.__alpha / (k_v * c_v)
+        return numpy.repeat(alpha_vc, k_v)
 
     def random(self, point=None):
         if point is not None:
@@ -75,12 +113,16 @@ class Structure:
         return adj
 
     def _mc_random(self, adj):
-        ch = numpy.random.choice(["reverse"])
+        n_edges = len(numpy.argwhere(adj == 1))
+        if n_edges != 0:
+            ch = numpy.random.choice(["reverse", "add", "remove"])
+        else:
+            ch = numpy.random.choice(["reverse", "add"])
         if ch == "remove":
             return self._remove_edge(adj)
-        if ch == "add":
+        elif ch == "add":
             return self._add_edge(adj)
-        if ch == "reverse":
+        elif ch == "reverse":
             return self._reverse_edge(adj)
         return adj
 
