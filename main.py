@@ -86,7 +86,7 @@ adj = numpy.array(
 #print(difficulty.lpd)
 
 bn = BayesianNetwork([difficulty, grade, has_studied, letter, sat], adj)
-data = bn.sample_data(100)
+data = bn.sample_data(1000)
 
 numpy.random.seed(23)
 adj = numpy.zeros_like(adj, dtype=numpy.int8)
@@ -99,11 +99,13 @@ for i in range(1000):
         best = adj
         best_score = score
 
-G = bn.as_graph(adj)
+G = bn.as_graph(best)
 print(networkx.is_directed_acyclic_graph(G))
 networkx.draw(G, with_labels=True)
 plt.show()
 
+
+networkx.spectral_layout()
 
 #print(bn.sample_data(1))
 

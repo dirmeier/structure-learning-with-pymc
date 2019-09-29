@@ -48,14 +48,16 @@ class BayesianNetwork:
         df = pd.DataFrame(
           np.empty((n, self.n_var), dtype=np.str),
           columns=self.varnames)
-        topo = [x for x in networkx.topological_sort(self.as_graph(self.__adj))]
+        topo = [x for x in networkx.topological_sort(self.as_graph())]
         for i in range(n):
             sample = df.loc[i]
             for j, t in enumerate(topo):
                 sample[self.var_map[t.name]] = t.sample(sample)
         return df
 
-    def as_graph(self, adj):
+    def as_graph(self, adj=None):
+        if adj is None:
+            adj = self.__adj
         graph = networkx.from_numpy_array(
           adj, create_using=networkx.DiGraph)
         graph = networkx.relabel_nodes(
