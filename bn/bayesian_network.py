@@ -2,6 +2,7 @@ import networkx
 import numpy as np
 import pandas as pd
 from pymc3 import Discrete
+from pymc3.model import FreeRV
 
 from bn.dag import DAG
 
@@ -10,21 +11,21 @@ class BayesianNetwork(Discrete):
     NAME = "BayesianNetwork"
 
     def __init__(self, dag, *args, **kwargs):
-        if not isinstance(dag, DAG):
-            raise TypeError()
-
-        super(BayesianNetwork, self).__init__(shape=dag.n_var, *args, **kwargs)
+        if not isinstance(dag, DAG) and not isinstance(dag, FreeRV):
+            raise TypeError(
+              "'dag' argument must be either DAG or FreeRV(DAGPrior)")
         self.__dag = dag
-
-        np.random.seed(23)
-        self.mode = np.repeat(1, dag.n_var)
+        super(BayesianNetwork, self).__init__(shape=self.n_var, *args, **kwargs)
+        self.mode = np.repeat(0, self.n_var)
 
     def logp(self, value):
         return 0
 
     @property
     def adj(self):
-        return self.dag.adj
+        if isinstance(self.dag, DAG):
+            return self.dag.adj
+        return self.dag.distribution.adj
 
     @property
     def dag(self):
@@ -32,39 +33,49 @@ class BayesianNetwork(Discrete):
 
     @property
     def var_map(self):
-        return self.dag.var_map
+        if isinstance(self.dag, DAG):
+            return self.dag.var_map
+        return self.dag.distribution.var_map
 
     @property
     def vars(self):
-        return self.dag.vars
+        if isinstance(self.dag, DAG):
+            return self.dag.vars
+        return self.dag.distribution.vars
 
     @property
     def n_var(self):
-        return self.dag.n_var
+        if isinstance(self.dag, DAG):
+            return self.dag.n_var
+        return self.dag.distribution.n_var
+
+    @property
+    def varnames(self):
+        if isinstance(self.dag, DAG):
+            return self.dag.varnames
+        return self.dag.distribution.varnames
 
     @property
     def name(self):
         return BayesianNetwork.NAME
 
-    @property
-    def varnames(self):
-        return self.dag.varnames
-
     def random(self, point=None, size=None):
         if size is None:
             size = 1
-        df = pd.DataFrame(
-          np.empty((size, self.n_var), dtype=np.str),
-          columns=self.varnames)
+        df = pd.DataFrame(np.empty((size, self.n_var), dtype=np.str),
+                          columns=self.varnames)
 
-        # TODO: update: for every i sample a dag, update the LPDs and then sample the BN
-
-        topo = [x for x in networkx.topological_sort(self.as_graph())]
-        for i in range(size):
-            sample = df.loc[i]
-            for j, t in enumerate(topo):
-                sample[self.var_map[t.name]] = t.sample(sample)
-        return df.values
+        if isinstance(self.dag, DAG):
+            topo = [x for x in networkx.topological_sort(self.as_graph())]
+            for i in range(size):
+                sample = df.loc[i]
+                for j, t in enumerate(topo):
+                    sample[self.var_map[t.name]] = t.sample(sample)
+        elif isinstance(self.dag, FreeRV):
+            for i in range(size):
+                adj = self.dag.random()
+                self.dag.distribution.adj = adj
+        return df
 
     def as_graph(self):
         graph = networkx.from_numpy_array(

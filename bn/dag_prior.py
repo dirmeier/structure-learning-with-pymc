@@ -2,30 +2,24 @@ import networkx
 import numpy as np
 import pandas as pd
 import scipy.stats
-from bidict import bidict
-from pymc3 import Discrete, Model
+from pymc3 import Discrete
 
+from bn.dag import DAG
 from bn.util import expand_grid, mv_beta
 from bn.variable import Variable
 
 
-class DAGPrior(Discrete):
-    NAME = "DAG"
+class DAGPrior(Discrete, DAG):
+    NAME = "DAGPrior"
     runif = scipy.stats.uniform.rvs
 
     def __init__(self, variables, *args, **kwargs):
         if any(not isinstance(x, Variable) for x in variables):
             raise TypeError()
-        if "adj" in kwargs:
-            print(variables)
-            self.__adj = kwargs.get("adj", None)
-        else:
-            k = 2
-            #super(DAG, self).__init__(shape=self.n_var, *args, **kwargs)
-        self.__vars = np.array(variables)
-        self.__varnames = [x.name for x in self.vars]
-        self.__n_var = len(variables)
-        self.__varidx_map = bidict({e.name: i for i, e in enumerate(self.vars)})
+        DAG.__init__(self, variables=variables, adj=None)
+        Discrete.__init__(self,
+                          shape=(self.n_var, self.n_var),
+                          *args, **kwargs)
 
         self.__prob = kwargs.get("prob", .5)
         self.__alpha = kwargs.get("alpha", 1)
@@ -36,24 +30,12 @@ class DAGPrior(Discrete):
         self.mode = self.random()
 
     @property
-    def var_map(self):
-        return self.__varidx_map
+    def name(self):
+        return DAG.NAME
 
     @property
     def dag(self):
         return self.__dag
-
-    @property
-    def vars(self):
-        return self.__vars
-
-    @property
-    def n_var(self):
-        return self.__n_var
-
-    @property
-    def name(self):
-        return DAG.NAME
 
     def logp(self, value):
         return 0
@@ -75,7 +57,7 @@ class DAGPrior(Discrete):
         joint_prime = np.exp(p_adj_prime + marg_lik_prime)
 
         ac = np.minimum(1.0, joint_prime / joint)
-        if ac > DAG.runif(size=1):
+        if ac > DAGPrior.runif(size=1):
             return new_adj, joint_prime
         else:
             return point, joint
@@ -127,7 +109,7 @@ class DAGPrior(Discrete):
         alpha_vc = self.__alpha / (k_v * c_v)
         return np.repeat(alpha_vc, k_v)
 
-    def random(self, point=None):
+    def random(self, point=None, size=None):
         if point is not None:
             return self._mc_random(point.copy())
         return self._random()
@@ -136,10 +118,10 @@ class DAGPrior(Discrete):
         adj = np.zeros(shape=(self.n_var, self.n_var), dtype=np.int8)
         for i in range(0, self.n_var - 1):
             for j in range(i + 1, self.n_var):
-                if self.__runif() <= self.__prob:
+                if DAGPrior.runif() <= self.__prob:
                     adj[i, j] = 1
         gm = np.random.permutation(self.vars)
-        idxs = np.array([self.__varidx_map[g] for g in gm])
+        idxs = np.array([self.var_map[g.name] for g in gm])
         adj = adj[idxs, :]
         adj = adj[:, idxs]
         return adj

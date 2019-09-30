@@ -7,6 +7,7 @@ import pandas as pd
 import pymc3 as pm
 from bn.bayesian_network import BayesianNetwork
 from bn.dag import DAG
+from bn.dag_prior import DAGPrior
 from bn.variable import Variable
 
 
@@ -88,7 +89,7 @@ adj = numpy.array(
 
 dag = DAG(variables=[difficulty, grade, has_studied, letter, sat], adj=adj)
 
-data = scipy.stats.norm.rvs(size=1000)
+#data = scipy.stats.norm.rvs(size=1000)
 
 with pm.Model():
     #network = Structure([difficulty, grade, has_studied, letter, sat],
@@ -97,14 +98,16 @@ with pm.Model():
     #pm.Normal('y', mu=mu, sd=1, observed=data)
     #prior = pm.sample_prior_predictive()
     #posterior = pm.sample(10, tune=10, nchains=1,cores=1)
-    #bn = BayesianNetwork('bn', dag=dag)
+    dag = DAGPrior('dag',
+                   variables=[difficulty, grade, has_studied, letter, sat])
+    bn = BayesianNetwork('bn', dag=dag)
     #p = pm.Uniform('p', 0, 1)
-    bs = pm.Bernoulli('s', p=.1, shape=1)
+    #bs = pm.Bernoulli('s', p=.1, shape=1)
     #print("asdasd")
     trace = pm.sample_prior_predictive(10)
     #trace = pm.sample(2)
 
-print(trace)
+print(trace['bn'])
 
 #
 # numpy.random.seed(23)

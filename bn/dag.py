@@ -1,16 +1,14 @@
 import numpy as np
-import scipy.stats
 from bidict import bidict
+
 from bn.variable import Variable
 
 
 class DAG:
-    NAME = "DAG"
-    runif = scipy.stats.uniform.rvs
-
     def __init__(self, variables, adj):
         if any(not isinstance(x, Variable) for x in variables):
             raise TypeError()
+
         self.__vars = np.array(variables)
         self.__varnames = [x.name for x in self.vars]
         self.__n_var = len(variables)
@@ -25,6 +23,15 @@ class DAG:
     def adj(self):
         return self.__adj
 
+    @adj.setter
+    def adj(self, value):
+        self.__adj = value
+        for i, v in enumerate(self.vars):
+            par_idxs = np.argwhere(value[:, i] == 1).flatten()
+            parents = self.vars[par_idxs]
+            v.update_lpd(parents)
+
+
     @property
     def vars(self):
         return self.__vars
@@ -36,3 +43,4 @@ class DAG:
     @property
     def varnames(self):
         return self.__varnames
+
