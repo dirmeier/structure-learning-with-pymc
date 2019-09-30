@@ -75,6 +75,7 @@ class BayesianNetwork(Discrete):
             for i in range(size):
                 adj = self.dag.random()
                 self.dag.distribution.adj = adj
+                k = 2
         return df
 
     def as_graph(self):

@@ -28,9 +28,8 @@ class DAG:
         self.__adj = value
         for i, v in enumerate(self.vars):
             par_idxs = np.argwhere(value[:, i] == 1).flatten()
-            parents = self.vars[par_idxs]
-            v.update_lpd(parents)
-
+            parents = list(self.vars[par_idxs])
+            v._update_lpd(parents)
 
     @property
     def vars(self):
