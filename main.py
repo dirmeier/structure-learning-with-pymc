@@ -1,11 +1,12 @@
 import numpy
 
 import networkx
+import scipy.stats
 import matplotlib.pyplot as plt
 import pandas as pd
-
+import pymc3 as pm
 from bn.bayesian_network import BayesianNetwork
-from bn.structure_distribution import Structure
+from bn.dag import DAG
 from bn.variable import Variable
 
 
@@ -85,27 +86,45 @@ adj = numpy.array(
 
 #print(difficulty.lpd)
 
-bn = BayesianNetwork([difficulty, grade, has_studied, letter, sat], adj)
-data = bn.sample_data(1000)
+dag = DAG(variables=[difficulty, grade, has_studied, letter, sat], adj=adj)
 
-numpy.random.seed(23)
-adj = numpy.zeros_like(adj, dtype=numpy.int8)
-distr = Structure([difficulty, grade, has_studied, letter, sat])
-best = adj
-best_score = -numpy.Inf
-for i in range(1000):
-    adj, score = distr.posterior_sample(data, adj)
-    if best_score < score:
-        best = adj
-        best_score = score
+data = scipy.stats.norm.rvs(size=1000)
 
-G = bn.as_graph(best)
-print(networkx.is_directed_acyclic_graph(G))
-networkx.draw(G, with_labels=True)
-plt.show()
+with pm.Model():
+    #network = Structure([difficulty, grade, has_studied, letter, sat],
+    #                    observed=data)
+    #mu = pm.Mu('m', mu=0, sd=1)
+    #pm.Normal('y', mu=mu, sd=1, observed=data)
+    #prior = pm.sample_prior_predictive()
+    #posterior = pm.sample(10, tune=10, nchains=1,cores=1)
+    #bn = BayesianNetwork('bn', dag=dag)
+    #p = pm.Uniform('p', 0, 1)
+    bs = pm.Bernoulli('s', p=.1, shape=1)
+    #print("asdasd")
+    trace = pm.sample_prior_predictive(10)
+    #trace = pm.sample(2)
 
+print(trace)
 
-networkx.spectral_layout()
+#
+# numpy.random.seed(23)
+# adj = numpy.zeros_like(adj, dtype=numpy.int8)
+# distr = Structure([difficulty, grade, has_studied, letter, sat])
+# best = adj
+# best_score = -numpy.Inf
+# for i in range(1000):
+#     adj, score = distr.posterior_sample(data, adj)
+#     if best_score < score:
+#         best = adj
+#         best_score = score
+#
+# G = bn.as_graph(best)
+# print(networkx.is_directed_acyclic_graph(G))
+# networkx.draw(G, with_labels=True)
+# plt.show()
+#
+#
+# networkx.spectral_layout()
 
 #print(bn.sample_data(1))
 

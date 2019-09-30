@@ -1,40 +1,46 @@
-import numpy
-
 import networkx
 import numpy as np
 import pandas as pd
-import scipy.stats
-from bidict import bidict
+from pymc3 import Discrete
 
-from bn.variable import Variable
+from bn.dag import DAG
 
 
-class BayesianNetwork:
+class BayesianNetwork(Discrete):
     NAME = "BayesianNetwork"
 
-    def __init__(self, variables, adj):
-        if not isinstance(variables, list):
-            raise TypeError()
-        if any(not isinstance(x, Variable) for x in variables):
+    def __init__(self, dag, *args, **kwargs):
+        if not isinstance(dag, DAG):
             raise TypeError()
 
-        self.__vars = np.array(variables)
-        self.__varnames = [x.name for x in self.vars]
-        self.__n_var = len(variables)
-        self.__varidx_map = bidict({e.name: i for i, e in enumerate(self.vars)})
-        self.__adj = adj
+        super(BayesianNetwork, self).__init__(shape=dag.n_var, *args, **kwargs)
+        self.__dag = dag
+
+        np.random.seed(23)
+        self.mode = np.repeat(1, dag.n_var)
+
+    def logp(self, value):
+        return 0
+
+    @property
+    def adj(self):
+        return self.dag.adj
+
+    @property
+    def dag(self):
+        return self.__dag
 
     @property
     def var_map(self):
-        return self.__varidx_map
+        return self.dag.var_map
 
     @property
     def vars(self):
-        return self.__vars
+        return self.dag.vars
 
     @property
     def n_var(self):
-        return self.__n_var
+        return self.dag.n_var
 
     @property
     def name(self):
@@ -42,24 +48,27 @@ class BayesianNetwork:
 
     @property
     def varnames(self):
-        return self.__varnames
+        return self.dag.varnames
 
-    def sample_data(self, n=1):
+    def random(self, point=None, size=None):
+        if size is None:
+            size = 1
         df = pd.DataFrame(
-          np.empty((n, self.n_var), dtype=np.str),
+          np.empty((size, self.n_var), dtype=np.str),
           columns=self.varnames)
+
+        # TODO: update: for every i sample a dag, update the LPDs and then sample the BN
+
         topo = [x for x in networkx.topological_sort(self.as_graph())]
-        for i in range(n):
+        for i in range(size):
             sample = df.loc[i]
             for j, t in enumerate(topo):
                 sample[self.var_map[t.name]] = t.sample(sample)
-        return df
+        return df.values
 
-    def as_graph(self, adj=None):
-        if adj is None:
-            adj = self.__adj
+    def as_graph(self):
         graph = networkx.from_numpy_array(
-          adj, create_using=networkx.DiGraph)
+          self.adj, create_using=networkx.DiGraph)
         graph = networkx.relabel_nodes(
           graph, {i: e for i, e in enumerate(self.vars)})
         return graph
