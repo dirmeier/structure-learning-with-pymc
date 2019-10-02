@@ -11,7 +11,7 @@ from bn.util import expand_grid, mv_beta
 class StructureMCMC(ArrayStep):
     runif = scipy.stats.uniform.rvs
 
-    def __init__(self, vars, data, model=None):
+    def __init__(self, vars, data, model=None, **kwargs):
         model = pymc3.modelcontext(model)
         if len(vars) != 1:
             raise ValueError("Please provide only one")
@@ -20,23 +20,25 @@ class StructureMCMC(ArrayStep):
         self.__var = vars[0]
         self.__var_name = self.__var.name
         self.__data = data
+        self.__alpha = kwargs.get("alpha", 1)
+        self.__acceptance_rate = kwargs.get("acceptance_rate", .5)
+
         super(StructureMCMC, self).__init__(vars, [model.fastlogp])
 
     def step(self, point):
-        adj = point['network']
-        point['network'] = \
-            self.__var.distribution.posterior_sample(adj)
+        adj = point['dag']
+        point['dag'], _ = self.smc(adj)
         return point
 
-    def posterior_sample(self, point):
-        new_adj = self.random(point)
+    def smc(self, point):
+        new_adj = self._random(point)
 
-        p_adj = self._log_prior_prob(point)
-        marg_lik = self._log_evidence(self.data, point)
+        p_adj = self.__var.distribution.logp(point)
+        marg_lik = self._log_evidence(self.__data, point)
         joint = np.exp(p_adj + marg_lik)
 
-        p_adj_prime = self._log_prior_prob(new_adj)
-        marg_lik_prime = self._log_evidence(self.data, new_adj)
+        p_adj_prime = self.__var.distribution.logp(new_adj)
+        marg_lik_prime = self._log_evidence(self.__data, new_adj)
         joint_prime = np.exp(p_adj_prime + marg_lik_prime)
 
         ac = np.minimum(1.0, joint_prime / joint)
@@ -44,6 +46,16 @@ class StructureMCMC(ArrayStep):
             return new_adj, joint_prime
         else:
             return point, joint
+
+    def _log_evidence(self, data, adj):
+        evidence = 0
+        for i, v in enumerate(self.__var.distribution.vars):
+            par_idx = np.argwhere(adj[:, i] == 1).flatten()
+            parents = None
+            if len(par_idx) != 0:
+                parents = [self.__var.distribution.vars[p] for p in par_idx]
+            evidence += self._local_evidence(v, data, parents)
+        return evidence
 
     def _local_evidence(self, v, data, parents):
         ev = 0
@@ -79,8 +91,7 @@ class StructureMCMC(ArrayStep):
         alpha_vc = self.__alpha / (k_v * c_v)
         return np.repeat(alpha_vc, k_v)
 
-
-    def random_mc(self, point=None, size=None):
+    def _random(self, point):
         n_edges = len(np.argwhere(point == 1))
         if n_edges != 0:
             ch = np.random.choice(["reverse", "add", "remove"])
@@ -104,7 +115,7 @@ class StructureMCMC(ArrayStep):
         args = np.argwhere(adj == 0)
         for i, j in args:
             adj[i, j] = 1
-            if networkx.is_directed_acyclic_graph(self.as_graph(adj)):
+            if networkx.is_directed_acyclic_graph(self._as_graph(adj)):
                 return adj
             adj[i, j] = 0
         return adj
@@ -114,8 +125,14 @@ class StructureMCMC(ArrayStep):
         for i, j in args:
             if adj[i, j] == 1 and adj[j, i] == 0:
                 adj[i, j], adj[j, i] = 0, 1
-            if networkx.is_directed_acyclic_graph(self.as_graph(adj)):
+            if networkx.is_directed_acyclic_graph(self._as_graph(adj)):
                 return adj
             adj[i, j], adj[j, i] = 1, 0
         return adj
 
+    def _as_graph(self, adj):
+        graph = networkx.from_numpy_array(
+          adj, create_using=networkx.DiGraph)
+        graph = networkx.relabel_nodes(
+          graph, {i: e for i, e in enumerate(self.__var.distribution.vars)})
+        return graph

@@ -79,7 +79,6 @@ class BayesianNetwork(Discrete):
         return df
 
     def __sample(self, topo, row):
-        # TODO : ovlve better
         sample = row
         for j, t in enumerate(topo):
             sample[self.var_map[t.name]] = t.sample_encoded(sample)

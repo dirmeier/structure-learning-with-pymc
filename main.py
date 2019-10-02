@@ -98,46 +98,20 @@ with pm.Model():
     bn = BayesianNetwork('bn', dag=dag, observed=data)
     step = StructureMCMC([dag], data=data)
     trace = pm.sample(
-             draws=1, tune=1, chains=1, cores=1,
+             draws=5, tune=1, chains=1, cores=1,
              step=step, random_seed=23)
 
+numpy.random.seed(23)
+adj = trace['dag'][1]
+best = adj.copy()
+best_score = -numpy.Inf
 
-# data = scipy.stats.poisson.rvs(size=4, mu=10)
-# print(data)
-# with pm.Model():
-#
-#     p = pm.Poisson('p', mu=10)
-#     pm.Poisson('y', mu=p, observed=data)
-#     trace = pm.sample(
-#              draws=10, tune=1, chains=1, cores=1,
-#               step = pm.Metropolis([p]),
-#              random_seed=23)
-#
-# print(trace['p'])
-# numpy.random.seed(23)
-# adj = numpy.zeros_like(adj, dtype=numpy.int8)
-# distr = Structure([difficulty, grade, has_studied, letter, sat])
-# best = adj
-# best_score = -numpy.Inf
-# for i in range(1000):
-#     adj, score = distr.posterior_sample(data, adj)
-#     if best_score < score:
-#         best = adj
-#         best_score = score
-#
-# G = bn.as_graph(best)
-# print(networkx.is_directed_acyclic_graph(G))
-# networkx.draw(G, with_labels=True)
-# plt.show()
-#
-#
-# networkx.spectral_layout()
+for i in range(100):
+    adj, score = step.smc(adj)
+    if best_score < score:
+        best = adj.copy()
+        best_score = score
 
-#print(bn.sample_data(1))
-
-#networkx.draw(G, with_labels=True)
-#plt.show()
-
-#print(grade.lpd)
-#print("------------")
-#print(difficulty.lpd)
+networkx.draw(step._as_graph(adj), with_labels=True)
+plt.draw()
+plt.show()

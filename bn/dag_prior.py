@@ -1,6 +1,7 @@
 import numpy as np
 import scipy.stats
 from pymc3 import Discrete
+from pymc3.model import FreeRV
 
 from bn.dag import DAG
 from bn.variable import Variable
@@ -18,11 +19,8 @@ class DAGPrior(Discrete, DAG):
                           shape=(self.n_var, self.n_var),
                           *args, **kwargs)
 
-        self.__prob = kwargs.get("prob", .5)
-        self.__alpha = kwargs.get("alpha", 1)
         self.__log_c = np.log(kwargs.get("c", 1))
-        self.__acceptance_rate = kwargs.get("acceptance_rate", .5)
-
+        self.__prob = kwargs.get("prob", .5)
         np.random.seed(23)
         self.mode = self.random()
 
@@ -35,7 +33,9 @@ class DAGPrior(Discrete, DAG):
         return self.__dag
 
     def logp(self, value):
-        return self.__log_c * len(np.argwhere(value.value == 1))
+        if isinstance(value, FreeRV):
+            return 0
+        return self.__log_c * len(np.argwhere(value == 1))
 
     @staticmethod
     def _repr_latex_(name=None, dist=None):
