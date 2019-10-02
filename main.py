@@ -93,25 +93,34 @@ with pm.Model():
 print(data.head())
 
 with pm.Model():
-    dag = DAGPrior(
-     'dag', variables=[difficulty, grade, has_studied, letter, sat])
-    bn = BayesianNetwork('bn', dag=dag, observed=data)
-    step = StructureMCMC([dag], data=data)
-    trace = pm.sample(
-             draws=5, tune=1, chains=1, cores=1,
-             step=step, random_seed=23)
+     dag = DAGPrior(
+      'dag', variables=[difficulty, grade, has_studied, letter, sat])
+#     bn = BayesianNetwork('bn', dag=dag, observed=data)
+     step = StructureMCMC([dag], data=data)
+#     trace = pm.sample(
+#              draws=5, tune=1, chains=1, cores=1,
+#              step=step, random_seed=23)
+#
 
-numpy.random.seed(23)
-adj = trace['dag'][1]
+adj = numpy.array(
+  [
+      [0, 1, 0, 0, 0],
+      [0, 0, 0, 1, 0],
+      [0, 1, 0, 0, 1],
+      [0, 0, 0, 0, 0],
+      [0, 0, 0, 0, 0]
+  ], dtype=numpy.int8
+)
+
 best = adj.copy()
 best_score = -numpy.Inf
 
-for i in range(100):
-    adj, score = step.smc(adj)
+for i in range(10):
+    adj, score = step.random(adj)
     if best_score < score:
         best = adj.copy()
         best_score = score
 
-networkx.draw(step._as_graph(adj), with_labels=True)
+networkx.draw(step.as_graph(adj), with_labels=True)
 plt.draw()
 plt.show()
