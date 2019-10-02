@@ -19,7 +19,10 @@ class BayesianNetwork(Discrete):
         self.mode = np.repeat(0, self.n_var)
 
     def logp(self, value):
-        return 0
+        if isinstance(value, FreeRV):
+            return 0
+        # TODO
+        return 1
 
     @property
     def adj(self):
@@ -62,21 +65,28 @@ class BayesianNetwork(Discrete):
     def random(self, point=None, size=None):
         if size is None:
             size = 1
-        df = pd.DataFrame(np.empty((size, self.n_var), dtype=np.str),
-                          columns=self.varnames)
-
+        df = pd.DataFrame(
+          np.empty((size, self.n_var), dtype=np.object), columns=self.varnames)
         if isinstance(self.dag, DAG):
-            topo = [x for x in networkx.topological_sort(self.as_graph())]
+            topo = self.__topological_order()
             for i in range(size):
-                sample = df.loc[i]
-                for j, t in enumerate(topo):
-                    sample[self.var_map[t.name]] = t.sample(sample)
+                df.loc[i] = self.__sample(topo, df.loc[i])
         elif isinstance(self.dag, FreeRV):
             for i in range(size):
-                adj = self.dag.random()
-                self.dag.distribution.adj = adj
-                k = 2
+                self.dag.distribution.adj = self.dag.random()
+                topo = self.__topological_order()
+                df.loc[i] = self.__sample(topo, df.loc[i])
         return df
+
+    def __sample(self, topo, row):
+        # TODO : ovlve better
+        sample = row
+        for j, t in enumerate(topo):
+            sample[self.var_map[t.name]] = t.sample_encoded(sample)
+        return sample
+
+    def __topological_order(self):
+        return [x for x in networkx.topological_sort(self.as_graph())]
 
     def as_graph(self):
         graph = networkx.from_numpy_array(

@@ -8,6 +8,7 @@ import pymc3 as pm
 from bn.bayesian_network import BayesianNetwork
 from bn.dag import DAG
 from bn.dag_prior import DAGPrior
+from bn.sampler import StructureMCMC
 from bn.variable import Variable
 
 
@@ -85,31 +86,34 @@ adj = numpy.array(
   ], dtype=numpy.int8
 )
 
-#print(difficulty.lpd)
-
 dag = DAG(variables=[difficulty, grade, has_studied, letter, sat], adj=adj)
-
-#data = scipy.stats.norm.rvs(size=1000)
+with pm.Model():
+    bn = BayesianNetwork('bn', dag=dag)
+    data = pm.sample_prior_predictive(100)['bn']
+print(data.head())
 
 with pm.Model():
-    #network = Structure([difficulty, grade, has_studied, letter, sat],
-    #                    observed=data)
-    #mu = pm.Mu('m', mu=0, sd=1)
-    #pm.Normal('y', mu=mu, sd=1, observed=data)
-    #prior = pm.sample_prior_predictive()
-    #posterior = pm.sample(10, tune=10, nchains=1,cores=1)
-    dag = DAGPrior('dag',
-                   variables=[difficulty, grade, has_studied, letter, sat])
-    bn = BayesianNetwork('bn', dag=dag)
-    #p = pm.Uniform('p', 0, 1)
-    #bs = pm.Bernoulli('s', p=.1, shape=1)
-    #print("asdasd")
-    trace = pm.sample_prior_predictive(10)
-    #trace = pm.sample(2)
+    dag = DAGPrior(
+     'dag', variables=[difficulty, grade, has_studied, letter, sat])
+    bn = BayesianNetwork('bn', dag=dag, observed=data)
+    step = StructureMCMC([dag], data=data)
+    trace = pm.sample(
+             draws=1, tune=1, chains=1, cores=1,
+             step=step, random_seed=23)
 
-print(trace['bn'])
 
+# data = scipy.stats.poisson.rvs(size=4, mu=10)
+# print(data)
+# with pm.Model():
 #
+#     p = pm.Poisson('p', mu=10)
+#     pm.Poisson('y', mu=p, observed=data)
+#     trace = pm.sample(
+#              draws=10, tune=1, chains=1, cores=1,
+#               step = pm.Metropolis([p]),
+#              random_seed=23)
+#
+# print(trace['p'])
 # numpy.random.seed(23)
 # adj = numpy.zeros_like(adj, dtype=numpy.int8)
 # distr = Structure([difficulty, grade, has_studied, letter, sat])
