@@ -87,9 +87,11 @@ class BayesianNetwork(Discrete):
     def __topological_order(self):
         return [x for x in networkx.topological_sort(self.as_graph())]
 
-    def as_graph(self):
+    def as_graph(self, adj=None):
+        if adj is None:
+            adj = self.adj
         graph = networkx.from_numpy_array(
-          self.adj, create_using=networkx.DiGraph)
+          adj, create_using=networkx.DiGraph)
         graph = networkx.relabel_nodes(
           graph, {i: e for i, e in enumerate(self.vars)})
         return graph

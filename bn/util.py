@@ -4,6 +4,7 @@ from itertools import product
 import pandas as pd
 from scipy.special import gamma
 
+
 def expand_grid(dic):
     return pd.DataFrame(
       [row for row in product(*dic.values())],
