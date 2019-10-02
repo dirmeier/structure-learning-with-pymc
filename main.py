@@ -89,18 +89,18 @@ adj = numpy.array(
 dag = DAG(variables=[difficulty, grade, has_studied, letter, sat], adj=adj)
 with pm.Model():
     bn = BayesianNetwork('bn', dag=dag)
-    data = pm.sample_prior_predictive(100)['bn']
+    data = pm.sample_prior_predictive(1000, random_seed=23)['bn']
 print(data.head())
 
 with pm.Model():
      dag = DAGPrior(
       'dag', variables=[difficulty, grade, has_studied, letter, sat])
-#     bn = BayesianNetwork('bn', dag=dag, observed=data)
+     bn = BayesianNetwork('bn', dag=dag, observed=data)
      step = StructureMCMC([dag], data=data)
-#     trace = pm.sample(
-#              draws=5, tune=1, chains=1, cores=1,
-#              step=step, random_seed=23)
-#
+     trace = pm.sample(
+              draws=1, tune=1, chains=1, cores=1,
+              step=step, random_seed=23)
+
 
 adj = numpy.array(
   [
@@ -112,10 +112,10 @@ adj = numpy.array(
   ], dtype=numpy.int8
 )
 
-best = adj.copy()
+best = trace['dag'][0].copy()
 best_score = -numpy.Inf
-
-for i in range(10):
+numpy.random.seed(2)
+for i in range(100):
     adj, score = step.random(adj)
     if best_score < score:
         best = adj.copy()

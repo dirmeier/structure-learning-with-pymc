@@ -66,7 +66,7 @@ class StructureMCMC(ArrayStep):
         if parents is None:
             ct = pd.DataFrame({None})
         else:
-            ct = expand_grid({p.name: p.domain for p in parents})
+            ct = expand_grid({p.name: p.encoding for p in parents})
         for _, c in ct.iterrows():
             n_vc = self._counts(v, c, data, parents)
             alpha_vc = self._pseudocounts(v, parents)
@@ -78,10 +78,10 @@ class StructureMCMC(ArrayStep):
         flt = ""
         if parents is not None:
             for p in parents:
-                flt += "{} == '{}' and ".format(p.name, c[p.name])
-        counts = [0] * len(v.domain)
-        for i, e in enumerate(v.domain):
-            e_flt = flt + "{} == '{}'".format(v.name, e)
+                flt += "{} == {} and ".format(p.name, c[p.name])
+        counts = [0] * len(v.encoding)
+        for i, e in enumerate(v.encoding):
+            e_flt = flt + "{} == {}".format(v.name, e)
             d = data.query(e_flt)
             counts[i] = d.shape[0]
         return np.array(counts)
@@ -90,8 +90,8 @@ class StructureMCMC(ArrayStep):
         if parents is None:
             c_v = 1
         else:
-            c_v = np.sum([len(p.domain) for p in parents])
-        k_v = len(v.domain)
+            c_v = np.sum([len(p.encoding) for p in parents])
+        k_v = len(v.encoding)
         alpha_vc = self.__alpha / (k_v * c_v)
         return np.repeat(alpha_vc, k_v)
 

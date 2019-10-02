@@ -12,7 +12,7 @@ class Variable:
         self.__name = name
         self.__domain = domain.copy()
         self.__encoding = {e: i for i, e in enumerate(self.domain)}
-
+        self.__encoded_arr = numpy.arange(len(domain))
         self.__lpd = lpd
         self.__encoded_lpd = None
         self.__parents = self._parents()
@@ -30,6 +30,10 @@ class Variable:
     @property
     def domain(self):
         return self.__domain
+
+    @property
+    def encoding(self):
+        return self.__encoded_arr
 
     @property
     def lpd(self):
