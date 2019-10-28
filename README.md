@@ -1,6 +1,7 @@
 # Structure learning with PyMC3
 
 [![Project Status](http://www.repostatus.org/badges/latest/concept.svg)](http://www.repostatus.org/#concept)
+[![Binder](https://mybinder.org/badge_logo.svg)](https://mybinder.org/v2/gh/dirmeier/structure-learning-with-pymc/master)
 
 > Demo how one could use PyMC3 to learn the structure of a Bayesian network.
 
